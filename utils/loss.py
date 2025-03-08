@@ -53,44 +53,30 @@ class ContrastiveLoss(nn.Module):
         if epoch is not None:
             self.update_beta(epoch)  # Update beta based on the current epoch
 
-        # 🔹 Debugging: Print tensor shapes
-        print(f"z_prev shape BEFORE reshape: {z_prev.shape}")
-        print(f"z_present shape BEFORE reshape: {z_present.shape}")
-        print(f"z_serv shape BEFORE reshape: {z_serv.shape}")
-
-        # 🔹 Ensure all tensors have the shape `[batch_size, feature_dim]`
+        # Ensure all tensors have the shape `[batch_size, feature_dim]`
         z_prev = z_prev.view(z_prev.size(0), -1)  # Flatten to [batch_size, feature_dim]
         z_present = z_present.view(z_present.size(0), -1)  # Flatten to [batch_size, feature_dim]
         z_serv = z_serv.view(z_serv.size(0), -1)  # Flatten to [batch_size, feature_dim]
 
-        # 🔹 Print the corrected shapes
-        print(f"z_prev shape AFTER reshape: {z_prev.shape}")
-        print(f"z_present shape AFTER reshape: {z_present.shape}")
-        print(f"z_serv shape AFTER reshape: {z_serv.shape}")
-
-        # 🔹 Normalize features
+        # Normalize features
         z_prev = F.normalize(z_prev, p=2, dim=1)
         z_present = F.normalize(z_present, p=2, dim=1)
         z_serv = F.normalize(z_serv, p=2, dim=1)
 
-        # 🔹 Compute pairwise similarity matrices
+        # Compute pairwise similarity matrices
         sim_prev_present = torch.matmul(z_prev, z_present.mT) / self.temp  # Use .mT for matrix transpose
         sim_prev_serv = torch.matmul(z_prev, z_serv.mT) / self.temp  # Use .mT for matrix transpose
 
-        # 🔹 Print similarity matrix shapes
-        print(f"sim_prev_present shape: {sim_prev_present.shape}")
-        print(f"sim_prev_serv shape: {sim_prev_serv.shape}")
-
-        # 🔹 Compute contrastive loss
+        # Compute contrastive loss
         logits = torch.cat([sim_prev_present, sim_prev_serv], dim=1)
         labels = torch.arange(z_prev.size(0), device=z_prev.device)  # Create labels for contrastive loss
         loss = F.cross_entropy(logits, labels)
 
-        # 🔹 Apply dynamic divergence penalty
+        # Apply dynamic divergence penalty
         if self.dynamic_beta:
             loss = loss * self.beta
 
-        # 🔹 Apply class-aware divergence penalty (if labels are provided)
+        # Apply class-aware divergence penalty (if labels are provided)
         if self.class_aware_beta and labels is not None:
             class_counts = torch.bincount(labels, minlength=z_prev.size(0))
             class_weights = 1.0 / (class_counts + 1e-6)  # Inverse frequency as weights
