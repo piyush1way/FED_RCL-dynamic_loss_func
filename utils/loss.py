@@ -113,48 +113,47 @@ class ContrastiveLoss(nn.Module):
         self.beta_decay = beta_decay
         self.class_aware_beta = class_aware_beta
         self.beta = beta_max  # Initialize beta to its maximum value
-
+        
     def update_beta(self, epoch):
         """Update the dynamic beta based on the training progress."""
         if self.dynamic_beta:
             self.beta = self.beta_min + (self.beta_max - self.beta_min) * (self.beta_decay ** epoch)
-
+            
     def forward(self, z_prev, z_present, z_serv, labels=None, epoch=None):
         """Compute the contrastive loss."""
         if epoch is not None:
             self.update_beta(epoch)
-
-        # ✅ Ensure all tensors have shape [batch_size, feature_dim]
+            
+        # Ensure all tensors have shape [batch_size, feature_dim]
         batch_size = z_prev.shape[0]
-        feature_dim = z_prev.shape[1:]
-
         z_prev = z_prev.view(batch_size, -1)  # Reshape to 2D [batch_size, feature_dim]
         z_present = z_present.view(batch_size, -1)
         z_serv = z_serv.view(batch_size, -1)
-
-        # ✅ Normalize features
+        
+        # Normalize features
         z_prev = F.normalize(z_prev, p=2, dim=1)
         z_present = F.normalize(z_present, p=2, dim=1)
         z_serv = F.normalize(z_serv, p=2, dim=1)
-
-        # ✅ Compute pairwise similarity matrices (fix transpose issue)
-        sim_prev_present = torch.matmul(z_prev, z_present.T) / self.temp
-        sim_prev_serv = torch.matmul(z_prev, z_serv.T) / self.temp
-
-        # ✅ Compute contrastive loss
+        
+        # Compute pairwise similarity matrices (fix transpose issue)
+        # Use torch.mm for 2D matrices or explicitly reshape for matmul
+        sim_prev_present = torch.mm(z_prev, z_present.t()) / self.temp
+        sim_prev_serv = torch.mm(z_prev, z_serv.t()) / self.temp
+        
+        # Compute contrastive loss
         logits = torch.cat([sim_prev_present, sim_prev_serv], dim=1)
         contrastive_labels = torch.arange(batch_size, device=z_prev.device)
         loss = F.cross_entropy(logits, contrastive_labels)
-
-        # ✅ Apply dynamic divergence penalty
+        
+        # Apply dynamic divergence penalty
         if self.dynamic_beta:
             loss = loss * self.beta
-
-        # ✅ Apply class-aware divergence penalty (if labels are provided)
+            
+        # Apply class-aware divergence penalty (if labels are provided)
         if self.class_aware_beta and labels is not None:
-            class_counts = torch.bincount(labels, minlength=batch_size)
+            class_counts = torch.bincount(labels, minlength=labels.max().item() + 1)
             class_weights = 1.0 / (class_counts[labels] + 1e-6)
-            loss = loss * class_weights
-
-        return loss.mean()
+            loss = loss * class_weights.mean()
+            
+        return loss
 
