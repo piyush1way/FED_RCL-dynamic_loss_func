@@ -818,6 +818,7 @@ class RCLClient(Client):
                                 z_prev=global_feature_l,
                                 z_present=local_feature_l,
                                 z_serv=global_feature_l,
+                                labels=labels,  # Pass labels for class-aware divergence penalty
                                 epoch=self.global_epoch,  # Pass the current epoch
                             )
                             if sub_loss_name not in losses:
