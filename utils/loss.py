@@ -74,8 +74,7 @@ class ContrastiveLoss(nn.Module):
         z_serv = F.normalize(z_serv, p=2, dim=1)
 
         # 🔹 Compute pairwise similarity matrices
-        # sim_prev_present = torch.matmul(z_prev, z_present.mT) / self.temp  # Use .mT for matrix transpose
-        sim_prev_present = torch.matmul(z_prev, z_present.permute(1, 0)) / self.temp
+        sim_prev_present = torch.matmul(z_prev, z_present.mT) / self.temp  # Use .mT for matrix transpose
         sim_prev_serv = torch.matmul(z_prev, z_serv.mT) / self.temp  # Use .mT for matrix transpose
 
         # 🔹 Print similarity matrix shapes
