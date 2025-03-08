@@ -58,13 +58,10 @@ class ContrastiveLoss(nn.Module):
         print(f"z_present shape BEFORE reshape: {z_present.shape}")
         print(f"z_serv shape BEFORE reshape: {z_serv.shape}")
 
-        batch_size = z_prev.shape[0]  # Get batch size
-        feature_dim = z_prev.shape[1:]  # Get feature dimensions
-
         # 🔹 Ensure all tensors have the shape `[batch_size, feature_dim]`
-        z_prev = z_prev.view(batch_size, -1)
-        z_present = z_present.view(batch_size, -1)
-        z_serv = z_serv.view(batch_size, -1)
+        z_prev = z_prev.view(z_prev.size(0), -1)  # Flatten to [batch_size, feature_dim]
+        z_present = z_present.view(z_present.size(0), -1)  # Flatten to [batch_size, feature_dim]
+        z_serv = z_serv.view(z_serv.size(0), -1)  # Flatten to [batch_size, feature_dim]
 
         # 🔹 Print the corrected shapes
         print(f"z_prev shape AFTER reshape: {z_prev.shape}")
