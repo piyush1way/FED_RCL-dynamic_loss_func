@@ -197,6 +197,13 @@ eval:
 
 analysis: False
 
+loss:
+  dynamic_beta: True  # Enable dynamic beta
+  beta_min: 0.1       # Minimum value of beta
+  beta_max: 1.0       # Maximum value of beta
+  beta_decay: 0.99    # Decay rate for beta
+  class_aware_beta: True  # Enable class-aware beta
+
 #################### Dataset Path ####################
 dataset_paths:
   cifar10: "/kaggle/input/cifar-10-batches-py"
