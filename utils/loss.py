@@ -57,6 +57,10 @@ class ContrastiveLoss(nn.Module):
         if epoch is not None:
             self.update_beta(epoch)  # Update beta based on the current epoch
 
+        # Ensure all tensors have the same batch size and feature dimension
+        assert z_prev.size(0) == z_present.size(0) == z_serv.size(0), "Batch sizes must match!"
+        assert z_prev.size(1) == z_present.size(1) == z_serv.size(1), "Feature dimensions must match!"
+
         # Normalize features
         z_prev = F.normalize(z_prev, p=2, dim=1)
         z_present = F.normalize(z_present, p=2, dim=1)
