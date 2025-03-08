@@ -318,29 +318,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-# def triplate_mean_lr(prev, pres, serv, lr):
-#     """Triplet mean learning rate adjustment."""
-#     xm = torch.mean(prev)
-#     ym = torch.mean(pres)
-#     zm = torch.mean(serv)
-#     return lr * (torch.mean(torch.tensor([xm, ym, zm])) / (xm + ym + zm + 1e-7))  # add epsilon to avoid division by zero
-
-def triplate_mean_lr(prev, pres, serv, lr):
-    xm = torch.mean(prev)
-    ym = torch.mean(pres)
-    zm = torch.mean(serv)
-    device = prev.device  # Ensure we use the same device as the input tensors
-    return lr * (torch.mean(torch.tensor([xm, ym, zm], device=device)) / (xm + ym + zm + 1e-7))
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, temp=0.1, margin=1.0, dynamic_beta=False, beta_min=0.1, beta_max=1.0, beta_decay=0.99, class_aware_beta=False):
+    def __init__(self, temp=0.1, temperature=None, margin=1.0, dynamic_beta=False, beta_min=0.1, beta_max=1.0, beta_decay=0.99, class_aware_beta=False):
         super(ContrastiveLoss, self).__init__()
-        self.temp = temperature if temperature is not None else temp
+
+        #  Correctly handle temp and temperature
+        self.temp = temperature if temperature is not None else temp  # Now temperature is defined!
+
         self.margin = margin
         self.dynamic_beta = dynamic_beta
         self.beta_min = beta_min
@@ -378,7 +363,7 @@ class ContrastiveLoss(nn.Module):
         sim_prev_serv = torch.matmul(z_prev, z_serv.T) / self.temp
 
         # Compute contrastive loss
-        loss = -torch.log(torch.exp(sim_prev_present) / (torch.exp(sim_prev_present) + torch.exp(sim_prev_serv)))
+        loss = -torch.log(torch.exp(sim_prev_present) / (torch.exp(sim_prev_present) + torch.exp(sim_prev_serv) + 1e-8))
 
         # Apply dynamic divergence penalty
         if self.dynamic_beta:
