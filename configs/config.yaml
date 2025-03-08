@@ -187,6 +187,13 @@ optimizer:
 server:
   name: Server
 
+loss_weights:
+  cls: 1.0        # Classification loss
+  cossim: 0.1     # Cosine similarity loss
+  prox: 0.01      # Proximal term
+  scl: 0.1        # Supervised contrastive loss
+  penalty: 0.1
+
 # trainer:
 #   global_rounds: 10
 
