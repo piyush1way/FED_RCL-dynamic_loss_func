@@ -72,14 +72,22 @@ class ContrastiveLoss(nn.Module):
         z_serv = F.normalize(z_serv, p=2, dim=1)
 
         # Compute pairwise similarity matrices
-        sim_prev_present = torch.matmul(z_prev, z_present.T) / self.temp
-        sim_prev_serv = torch.matmul(z_prev, z_serv.T) / self.temp
+        # Adjust dimensions if necessary
+        if z_prev.shape[1] != 1:
+            # If z_prev and z_present are not vectors, compute similarity differently
+            # For example, using cosine similarity directly
+            sim_prev_present = F.cosine_similarity(z_prev.unsqueeze(1), z_present.unsqueeze(2), dim=0) / self.temp
+            sim_prev_serv = F.cosine_similarity(z_prev.unsqueeze(1), z_serv.unsqueeze(2), dim=0) / self.temp
+        else:
+            sim_prev_present = torch.matmul(z_prev, z_present.T) / self.temp
+            sim_prev_serv = torch.matmul(z_prev, z_serv.T) / self.temp
 
         # Debugging: Print similarity matrix shapes
         print(f"sim_prev_present shape: {sim_prev_present.shape}")
         print(f"sim_prev_serv shape: {sim_prev_serv.shape}")
 
         # Compute contrastive loss
+        # Use F.cross_entropy for numerical stability
         logits = torch.cat([sim_prev_present, sim_prev_serv], dim=1)
         labels = torch.arange(z_prev.size(0), device=z_prev.device)  # Create labels for contrastive loss
         loss = F.cross_entropy(logits, labels)
