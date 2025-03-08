@@ -332,7 +332,10 @@ def triplate_mean_lr(prev, pres, serv, lr):
     device = prev.device  # Ensure we use the same device as the input tensors
     return lr * (torch.mean(torch.tensor([xm, ym, zm], device=device)) / (xm + ym + zm + 1e-7))
 
-
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
 
 class ContrastiveLoss(nn.Module):
     def __init__(self, temp=0.1, margin=1.0, dynamic_beta=False, beta_min=0.1, beta_max=1.0, beta_decay=0.99, class_aware_beta=False):
