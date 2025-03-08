@@ -41,13 +41,9 @@ class RCLClient(Client):
             # Convert OmegaConf DictConfig to a mutable dictionary
             args_rcl_dict = OmegaConf.to_container(args_rcl, resolve=True)
 
-            # Remove unwanted keys (e.g., "weight") and keep only valid ContrastiveLoss arguments
-            allowed_keys = {"temp", "margin", "lr", "dynamic_beta", "beta_min", "beta_max", "beta_decay", "class_aware_beta"}
+            # Filter arguments to only include valid ContrastiveLoss parameters
+            allowed_keys = {"temp", "margin", "dynamic_beta", "beta_min", "beta_max", "beta_decay", "class_aware_beta"}
             args_contrastive = {k: v for k, v in args_rcl_dict.items() if k in allowed_keys}
-
-            # Rename "temp" to "temperature" if it exists, since some implementations use this
-            if "temp" in args_contrastive:
-                args_contrastive["temperature"] = args_contrastive.pop("temp")
 
             # Initialize the ContrastiveLoss with the filtered arguments
             loss_obj = ContrastiveLoss(**args_contrastive)
@@ -193,7 +189,6 @@ class RCLClient(Client):
                 breakpoint()
     
         return losses
-
 
     def _algorithm(self, images, labels) -> Dict:
         losses = defaultdict(float)
