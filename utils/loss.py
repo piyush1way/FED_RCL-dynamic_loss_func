@@ -66,7 +66,7 @@ class ContrastiveLoss(nn.Module):
         z_present = F.normalize(z_present, p=2, dim=1)
         z_serv = F.normalize(z_serv, p=2, dim=1)
 
-        # Compute similarity matrices
+        # Compute pairwise similarity matrices
         sim_prev_present = torch.matmul(z_prev, z_present.T) / self.temp
         sim_prev_serv = torch.matmul(z_prev, z_serv.T) / self.temp
 
