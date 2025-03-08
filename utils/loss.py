@@ -44,44 +44,34 @@ class ContrastiveLoss(nn.Module):
         if epoch is not None:
             self.update_beta(epoch)  # Update beta based on the current epoch
         
-        # Ensure all inputs are properly shaped
+        # Print tensor shapes for debugging
+        print(f"Input shapes: z_prev={z_prev.shape}, z_present={z_present.shape}, z_serv={z_serv.shape}")
+        
+        # Ensure tensors are properly reshaped
         batch_size = z_prev.size(0)
         
-        # Handle different types of tensors and ensure proper dimensionality
-        # For each tensor, we'll extract the feature dimension based on specific conditions
-        
-        if len(z_prev.shape) == 2:  # Already 2D [batch_size, features]
-            z_prev_features = z_prev
-        elif len(z_prev.shape) == 4:  # Convolutional features [batch_size, channels, height, width]
-            z_prev_features = z_prev.reshape(batch_size, -1)
-        else:
-            raise ValueError(f"Unexpected shape for z_prev: {z_prev.shape}")
+        if len(z_prev.shape) > 2:
+            z_prev = z_prev.reshape(batch_size, -1)
+        if len(z_present.shape) > 2:
+            z_present = z_present.reshape(batch_size, -1)
+        if len(z_serv.shape) > 2:
+            z_serv = z_serv.reshape(batch_size, -1)
             
-        if len(z_present.shape) == 2:  # Already 2D
-            z_present_features = z_present
-        elif len(z_present.shape) == 4:  # Convolutional features
-            z_present_features = z_present.reshape(batch_size, -1)
-        else:
-            raise ValueError(f"Unexpected shape for z_present: {z_present.shape}")
-            
-        if len(z_serv.shape) == 2:  # Already 2D
-            z_serv_features = z_serv
-        elif len(z_serv.shape) == 4:  # Convolutional features
-            z_serv_features = z_serv.reshape(batch_size, -1)
-        else:
-            raise ValueError(f"Unexpected shape for z_serv: {z_serv.shape}")
+        print(f"Reshaped: z_prev={z_prev.shape}, z_present={z_present.shape}, z_serv={z_serv.shape}")
         
         # Normalize features
-        z_prev_features = F.normalize(z_prev_features, p=2, dim=1)
-        z_present_features = F.normalize(z_present_features, p=2, dim=1)
-        z_serv_features = F.normalize(z_serv_features, p=2, dim=1)
+        z_prev = F.normalize(z_prev, p=2, dim=1)
+        z_present = F.normalize(z_present, p=2, dim=1)
+        z_serv = F.normalize(z_serv, p=2, dim=1)
         
-        # Calculate cosine similarity directly using einsum for clarity and safety
-        # This avoids issues with transpose operations
-        sim_prev_present = torch.einsum('bi,bj->ij', z_prev_features, z_present_features) / self.temp
-        sim_prev_serv = torch.einsum('bi,bj->ij', z_prev_features, z_serv_features) / self.temp
+        # Compute similarity matrices correctly
+        # Use permute(1, 0) instead of .T to ensure the correct shape
+        sim_prev_present = torch.matmul(z_prev, z_present.permute(1, 0)) / self.temp
+        sim_prev_serv = torch.matmul(z_prev, z_serv.permute(1, 0)) / self.temp
         
-        # Compute contrastive loss
+        print(f"Similarity matrix shapes: sim_prev_present={sim_prev_present.shape}, sim_prev_serv={sim_prev_serv.shape}")
+        
+        # Compute contrastive loss using cross-entropy
         logits = torch.cat([sim_prev_present, sim_prev_serv], dim=1)
         contrastive_labels = torch.arange(batch_size, device=z_prev.device)
         loss = F.cross_entropy(logits, contrastive_labels)
@@ -92,13 +82,9 @@ class ContrastiveLoss(nn.Module):
         
         # Apply class-aware divergence penalty (if labels are provided)
         if self.class_aware_beta and labels is not None:
-            # Make sure labels has the right shape
-            if len(labels.shape) > 1:
-                labels = labels.squeeze()
-                
             class_counts = torch.bincount(labels, minlength=labels.max().item() + 1)
             class_weights = 1.0 / (class_counts[labels] + 1e-6)  # Inverse frequency as weights
-            weighted_loss = loss * class_weights.mean()
-            loss = weighted_loss
+            weighted_loss = loss * class_weights
+            loss = weighted_loss.mean()
         
         return loss
