@@ -765,78 +765,78 @@ class RCLClient(Client):
         self.trainer = trainer
 
     def _algorithm_rcl(self, local_results, global_results, labels):
-        """
-        Computes the RCL (Relaxed Contrastive Learning) loss for each layer using ContrastiveLoss.
-        For each layer, we use:
-        - z_prev: global feature (from the server/global model)
-        - z_present: local feature (from the client model)
-        - z_serv: global feature (used for regularization)
-        """
-        losses = {"cossim": []}
-        rcl_args = self.args.client.rcl_loss
-
-        for l in range(self.num_layers):
-            # Decide whether to train this layer based on branch_level.
-            train_layer = False
-            if rcl_args.branch_level is False or l in rcl_args.branch_level:
-                train_layer = True
-
-            local_feature_l = local_results[f"layer{l}"]
-            global_feature_l = global_results[f"layer{l}"]
-
-            if len(local_feature_l.shape) == 4:
-                local_feature_l = F.adaptive_avg_pool2d(local_feature_l, 1)
-                global_feature_l = F.adaptive_avg_pool2d(global_feature_l, 1)
-
-            # Compute feature cosine similarity loss for alignment.
-            if self.args.client.feature_align_loss.align_type == "l2":
-                loss_cossim = F.mse_loss(
-                    local_feature_l.squeeze(-1).squeeze(-1),
-                    global_feature_l.squeeze(-1).squeeze(-1),
-                )
-            else:
-                loss_cossim = F.cosine_embedding_loss(
-                    local_feature_l.squeeze(-1).squeeze(-1),
-                    global_feature_l.squeeze(-1).squeeze(-1),
-                    torch.ones_like(labels),
-                )
-            losses["cossim"].append(loss_cossim)
-
-            # Compute RCL loss using ContrastiveLoss.
-            if train_layer:
-                for sub_loss_name in self.rcl_criterions:
-                    rcl_criterion = self.rcl_criterions[sub_loss_name]
-                    if rcl_criterion is not None:
-                        # If the pair config specifies branch_level, verify this layer should be trained.
-                        if rcl_criterion.pair.get("branch_level"):
-                            train_layer = l in rcl_criterion.pair.branch_level
-
-                        if train_layer:
-                            # Call ContrastiveLoss using the new parameter names.
-                            # Use global_feature_l as both z_prev and z_serv, and local_feature_l as z_present.
-                            loss_rcl = rcl_criterion(
-                                z_prev=global_feature_l,
-                                z_present=local_feature_l,
-                                z_serv=global_feature_l,
-                                labels=labels,  # Pass labels for class-aware divergence penalty
-                                epoch=self.global_epoch,  # Pass the current epoch
-                            )
-                            if sub_loss_name not in losses:
-                                losses[sub_loss_name] = []
-                            losses[sub_loss_name].append(loss_rcl)
-
-        # Aggregate losses over layers.
-        for loss_name in losses:
-            try:
-                if len(losses[loss_name]) > 0:
-                    losses[loss_name] = torch.mean(torch.stack(losses[loss_name]))
-                else:
-                    losses[loss_name] = 0
-            except Exception as e:
-                print("Error stacking losses for", loss_name, ":", e)
-                breakpoint()
-
-        return losses
+                """
+                Computes the RCL (Relaxed Contrastive Learning) loss for each layer using ContrastiveLoss.
+                For each layer, we use:
+                - z_prev: global feature (from the server/global model)
+                - z_present: local feature (from the client model)
+                - z_serv: global feature (used for regularization)
+                """
+                losses = {"cossim": []}
+                rcl_args = self.args.client.rcl_loss
+            
+                for l in range(self.num_layers):
+                    # Decide whether to train this layer based on branch_level.
+                    train_layer = False
+                    if rcl_args.branch_level is False or l in rcl_args.branch_level:
+                        train_layer = True
+            
+                    local_feature_l = local_results[f"layer{l}"]
+                    global_feature_l = global_results[f"layer{l}"]
+            
+                    if len(local_feature_l.shape) == 4:
+                        local_feature_l = F.adaptive_avg_pool2d(local_feature_l, 1)
+                        global_feature_l = F.adaptive_avg_pool2d(global_feature_l, 1)
+            
+                    # Compute feature cosine similarity loss for alignment.
+                    if self.args.client.feature_align_loss.align_type == "l2":
+                        loss_cossim = F.mse_loss(
+                            local_feature_l.squeeze(-1).squeeze(-1),
+                            global_feature_l.squeeze(-1).squeeze(-1),
+                        )
+                    else:
+                        loss_cossim = F.cosine_embedding_loss(
+                            local_feature_l.squeeze(-1).squeeze(-1),
+                            global_feature_l.squeeze(-1).squeeze(-1),
+                            torch.ones_like(labels),
+                        )
+                    losses["cossim"].append(loss_cossim)
+            
+                    # Compute RCL loss using ContrastiveLoss.
+                    if train_layer:
+                        for sub_loss_name in self.rcl_criterions:
+                            rcl_criterion = self.rcl_criterions[sub_loss_name]
+                            if rcl_criterion is not None:
+                                # If the pair config specifies branch_level, verify this layer should be trained.
+                                if rcl_criterion.pair.get("branch_level"):
+                                    train_layer = l in rcl_criterion.pair.branch_level
+            
+                                if train_layer:
+                                    # Call ContrastiveLoss using the new parameter names.
+                                    # Use global_feature_l as both z_prev and z_serv, and local_feature_l as z_present.
+                                    loss_rcl = rcl_criterion(
+                                        z_prev=global_feature_l,
+                                        z_present=local_feature_l,
+                                        z_serv=global_feature_l,
+                                        labels=labels,  # Pass labels for class-aware divergence penalty
+                                        epoch=self.global_epoch,  # Pass the current epoch
+                                    )
+                                    if sub_loss_name not in losses:
+                                        losses[sub_loss_name] = []
+                                    losses[sub_loss_name].append(loss_rcl)
+            
+                # Aggregate losses over layers.
+                for loss_name in losses:
+                    try:
+                        if len(losses[loss_name]) > 0:
+                            losses[loss_name] = torch.mean(torch.stack(losses[loss_name]))
+                        else:
+                            losses[loss_name] = 0
+                    except Exception as e:
+                        print("Error stacking losses for", loss_name, ":", e)
+                        breakpoint()
+            
+                return losses
 
     def _algorithm(self, images, labels) -> Dict:
         losses = defaultdict(float)
