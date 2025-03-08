@@ -699,8 +699,11 @@ class RCLClient(Client):
             args_contrastive = {k: v for k, v in args_rcl_dict.items() if k in allowed_keys}
 
             # Rename "temp" to "temperature" if it exists, since some implementations use this
+            # if "temp" in args_contrastive:
+            #     args_contrastive["temperature"] = args_contrastive.pop("temp")
             if "temp" in args_contrastive:
-                args_contrastive["temperature"] = args_contrastive.pop("temp")
+                args_contrastive["temp"] = args_contrastive.pop("temp")  #  Keep it as "temp"
+
 
             # Initialize the ContrastiveLoss with the filtered arguments
             loss_obj = ContrastiveLoss(**args_contrastive)
