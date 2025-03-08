@@ -1,3 +1,5 @@
+
+
 # #!/usr/bin/env python
 # # coding: utf-8
 # import copy
@@ -810,7 +812,8 @@ class RCLClient(Client):
                                 # If the pair config specifies branch_level, verify this layer should be trained.
                                 if rcl_criterion.pair.get("branch_level"):
                                     train_layer = l in rcl_criterion.pair.branch_level
-            
+                                print(f"Global Epoch: {self.global_epoch}")  # Debugging
+                                assert self.global_epoch is not None, "Error: global_epoch is None"
                                 if train_layer:
                                     # Call ContrastiveLoss using the new parameter names.
                                     # Use global_feature_l as both z_prev and z_serv, and local_feature_l as z_present.
