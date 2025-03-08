@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class ContrastiveLoss(nn.Module):
+ass ContrastiveLoss(nn.Module):
     def __init__(self, temp=0.1, temperature=None, margin=1.0, dynamic_beta=False, beta_min=0.1, beta_max=1.0, beta_decay=0.99, class_aware_beta=False):
         """
         Contrastive Loss with dynamic and class-aware divergence penalties.
