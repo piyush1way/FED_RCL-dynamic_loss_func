@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, temp=0.1, temperature=None, margin=1.0, dynamic_beta=False, beta_min=0.1, beta_max=1.0, beta_decay=0.99, class_aware_beta=False):
+    def __init__(self, temp=0.1, temperature=None, margin=1.0, dynamic_beta=False, 
+                 beta_min=0.1, beta_max=1.0, beta_decay=0.99, class_aware_beta=False):
         """
         Contrastive Loss with dynamic and class-aware divergence penalties.
 
@@ -31,12 +32,7 @@ class ContrastiveLoss(nn.Module):
         self.beta = beta_max  # Initialize beta to its maximum value
 
     def update_beta(self, epoch):
-        """
-        Update the dynamic beta based on the training progress.
-
-        Args:
-            epoch (int): Current epoch.
-        """
+        """Update the dynamic beta based on the training progress."""
         if self.dynamic_beta:
             self.beta = self.beta_min + (self.beta_max - self.beta_min) * (self.beta_decay ** epoch)
 
@@ -62,26 +58,33 @@ class ContrastiveLoss(nn.Module):
         print(f"z_present shape: {z_present.shape}")
         print(f"z_serv shape: {z_serv.shape}")
 
-        # Ensure all tensors have the same batch size and feature dimension
-        assert z_prev.size(0) == z_present.size(0) == z_serv.size(0), "Batch sizes must match!"
-        assert z_prev.size(1) == z_present.size(1) == z_serv.size(1), "Feature dimensions must match!"
+        # Ensure all tensors have shape [batch_size, feature_dim]
+        batch_size, feature_dim = z_prev.shape[0], z_prev.shape[1]
 
-        # Normalize features
+        z_prev = z_prev.view(batch_size, feature_dim)
+        z_present = z_present.view(batch_size, feature_dim)
+        z_serv = z_serv.view(batch_size, feature_dim)
+
+        # Normalize feature vectors
         z_prev = F.normalize(z_prev, p=2, dim=1)
         z_present = F.normalize(z_present, p=2, dim=1)
         z_serv = F.normalize(z_serv, p=2, dim=1)
 
-        # Compute pairwise similarity matrices
-        sim_prev_present = torch.matmul(z_prev, z_present.T) / self.temp
-        sim_prev_serv = torch.matmul(z_prev, z_serv.T) / self.temp
+        # Compute pairwise similarity matrices using .mT (correct transposition)
+        sim_prev_present = torch.matmul(z_prev, z_present.mT) / self.temp
+        sim_prev_serv = torch.matmul(z_prev, z_serv.mT) / self.temp
 
         # Debugging: Print similarity matrix shapes
         print(f"sim_prev_present shape: {sim_prev_present.shape}")
         print(f"sim_prev_serv shape: {sim_prev_serv.shape}")
 
-        # Compute contrastive loss
+        # Concatenate similarity matrices
         logits = torch.cat([sim_prev_present, sim_prev_serv], dim=1)
-        labels = torch.arange(z_prev.size(0), device=z_prev.device)  # Create labels for contrastive loss
+
+        # Create labels for contrastive loss
+        labels = torch.arange(batch_size, device=z_prev.device)
+
+        # Compute cross-entropy loss
         loss = F.cross_entropy(logits, labels)
 
         # Apply dynamic divergence penalty
@@ -90,7 +93,7 @@ class ContrastiveLoss(nn.Module):
 
         # Apply class-aware divergence penalty (if labels are provided)
         if self.class_aware_beta and labels is not None:
-            class_counts = torch.bincount(labels, minlength=z_prev.size(0))
+            class_counts = torch.bincount(labels, minlength=batch_size)
             class_weights = 1.0 / (class_counts + 1e-6)  # Inverse frequency as weights
             loss = loss * class_weights[labels]
 
