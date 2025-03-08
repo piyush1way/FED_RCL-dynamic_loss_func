@@ -317,7 +317,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import numpy as np
 # def triplate_mean_lr(prev, pres, serv, lr):
 #     """Triplet mean learning rate adjustment."""
 #     xm = torch.mean(prev)
@@ -333,36 +333,58 @@ def triplate_mean_lr(prev, pres, serv, lr):
     return lr * (torch.mean(torch.tensor([xm, ym, zm], device=device)) / (xm + ym + zm + 1e-7))
 
 
+
 class ContrastiveLoss(nn.Module):
-    def __init__(self, temperature=0.5, margin=0.2, lr=1e-3):
+    def __init__(self, temp=0.1, margin=1.0, dynamic_beta=False, beta_min=0.1, beta_max=1.0, beta_decay=0.99, class_aware_beta=False):
         super(ContrastiveLoss, self).__init__()
-        self.temperature = temperature
+        self.temp = temp
         self.margin = margin
-        self.lr = lr
-    
-    def forward(self, z_prev, z_present, z_serv):
-        """Computes the contrastive loss."""
-        # Normalize the embeddings for stability
-        z_prev = F.normalize(z_prev, dim=-1)
-        z_present = F.normalize(z_present, dim=-1)
+        self.dynamic_beta = dynamic_beta
+        self.beta_min = beta_min
+        self.beta_max = beta_max
+        self.beta_decay = beta_decay
+        self.class_aware_beta = class_aware_beta
+        self.beta = beta_max  # Initialize beta to its maximum value
+
+    def update_beta(self, epoch):
+        """Update the dynamic beta based on the training progress."""
+        if self.dynamic_beta:
+            self.beta = self.beta_min + (self.beta_max - self.beta_min) * (self.beta_decay ** epoch)
+
+    def forward(self, z_prev, z_present, z_serv, labels=None, epoch=None):
+        """
+        Compute the contrastive loss with dynamic and class-aware divergence penalties.
         
-        # Compute the squared components for the loss terms
-        sqpres = torch.square(z_present)
-        # Compute margin term: for each element, compute (margin - value) and clamp below 0, then square it.
-        sqMar = torch.square(torch.clamp_min(self.margin - z_present, 0))
-        
-        # Compute a combined loss term.
-        # Here, the formulation is: mean(z_prev * sqpres + (1 - z_prev) * sqMar)
-        loss = torch.mean(z_prev * sqpres + (1 - z_prev) * sqMar)
-        loss = loss - (loss * self.lr)  # Scale loss by (1 - lr)
-        
-        # Update the learning rate in a detached manner to avoid interfering with gradients.
-        new_lr = triplate_mean_lr(z_prev, z_present, z_serv, self.lr)
-        self.lr = new_lr.detach()
-        
-        # Compute a regularization term using the server feature:
-        srv = torch.sqrt(torch.sum(torch.square(z_serv)))
-        # Clamp srv to avoid log(0) issues
-        srv = torch.log(torch.clamp_min(srv, 1e-7))
-        
-        return loss / srv
+        Args:
+            z_prev: Global features from the previous round.
+            z_present: Local features from the current round.
+            z_serv: Global features from the server.
+            labels: Class labels for class-aware divergence penalty.
+            epoch: Current epoch for dynamic beta update.
+        """
+        if epoch is not None:
+            self.update_beta(epoch)  # Update beta based on the current epoch
+
+        # Normalize features
+        z_prev = F.normalize(z_prev, p=2, dim=1)
+        z_present = F.normalize(z_present, p=2, dim=1)
+        z_serv = F.normalize(z_serv, p=2, dim=1)
+
+        # Compute similarity matrices
+        sim_prev_present = torch.matmul(z_prev, z_present.T) / self.temp
+        sim_prev_serv = torch.matmul(z_prev, z_serv.T) / self.temp
+
+        # Compute contrastive loss
+        loss = -torch.log(torch.exp(sim_prev_present) / (torch.exp(sim_prev_present) + torch.exp(sim_prev_serv)))
+
+        # Apply dynamic divergence penalty
+        if self.dynamic_beta:
+            loss = loss * self.beta
+
+        # Apply class-aware divergence penalty (if labels are provided)
+        if self.class_aware_beta and labels is not None:
+            class_counts = torch.bincount(labels, minlength=z_prev.size(0))
+            class_weights = 1.0 / (class_counts + 1e-6)  # Inverse frequency as weights
+            loss = loss * class_weights[labels]
+
+        return loss.mean()
