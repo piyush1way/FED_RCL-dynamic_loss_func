@@ -57,6 +57,11 @@ class ContrastiveLoss(nn.Module):
         if epoch is not None:
             self.update_beta(epoch)  # Update beta based on the current epoch
 
+        # Debugging: Print tensor shapes
+        print(f"z_prev shape: {z_prev.shape}")
+        print(f"z_present shape: {z_present.shape}")
+        print(f"z_serv shape: {z_serv.shape}")
+
         # Ensure all tensors have the same batch size and feature dimension
         assert z_prev.size(0) == z_present.size(0) == z_serv.size(0), "Batch sizes must match!"
         assert z_prev.size(1) == z_present.size(1) == z_serv.size(1), "Feature dimensions must match!"
@@ -69,6 +74,10 @@ class ContrastiveLoss(nn.Module):
         # Compute pairwise similarity matrices
         sim_prev_present = torch.matmul(z_prev, z_present.T) / self.temp
         sim_prev_serv = torch.matmul(z_prev, z_serv.T) / self.temp
+
+        # Debugging: Print similarity matrix shapes
+        print(f"sim_prev_present shape: {sim_prev_present.shape}")
+        print(f"sim_prev_serv shape: {sim_prev_serv.shape}")
 
         # Compute contrastive loss
         logits = torch.cat([sim_prev_present, sim_prev_serv], dim=1)
